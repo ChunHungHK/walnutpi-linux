@@ -168,3 +168,6 @@ sphinx_*/
 
 # Rust analyzer configuration
 /rust-project.json
+*fixup.scr
+
+arch/arm64/boot/dts/allwinner/overlay/sun50i-h616-fixup.scr
