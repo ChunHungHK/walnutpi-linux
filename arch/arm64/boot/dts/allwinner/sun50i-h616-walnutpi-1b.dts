@@ -113,7 +113,22 @@
         clock-frequency = <2000000>;
         status = "okay";
 	};
-
+	thermal-zones {
+		cpu-thermal {
+			trips {
+				cpu-crit {
+					temperature = <300000>;
+				};
+			};
+		};
+		gpu-thermal {
+			trips {
+				gpu-crit {
+					type = "passive";
+				};
+			};
+		};
+	};
 };
 
 // &pwm1{
@@ -429,7 +444,7 @@
 };
 
 &spi0  {
-	status = "okay";
+	status = "disabled";
 
 	// flash@0 {
 	// 	#address-cells = <1>;
