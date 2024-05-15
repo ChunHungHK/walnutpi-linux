@@ -131,18 +131,19 @@
 	};
 };
 
-// &pwm1{
-//     status = "okay";
-// };
-// &pwm2{
-//     status = "okay";
-// };
-// &pwm3{
-//     status = "okay";
-// };
-// &pwm4{
-//     status = "okay";
-// };
+&pwm1{
+	pinctrl-0 = <&pwm1_pi_pin>;
+};
+&pwm2{
+	pinctrl-0 = <&pwm2_pi_pin>;
+};
+&pwm3{
+	pinctrl-0 = <&pwm3_pi_pin>;
+};
+&pwm4{
+	pinctrl-0 = <&pwm4_pi_pin>;
+};
+
 &pwm5 {
     // clk_bypass_output = 1 for Clock direct output without frequency division
     // so pwm5 output is 24MHz for AC200 & AC300 clock
