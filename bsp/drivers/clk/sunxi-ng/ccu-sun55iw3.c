@@ -434,24 +434,12 @@ static SUNXI_CCU_GATE(bus_g2d_clk, "bus-g2d",
 /* Delete the pll-peri0-800m. If GPU use pll-peri0-800m, gpu will occur job fault */
 static const char * const gpu_parents[] = {"pll-gpu", "", "pll-peri0-600m", "pll-peri0-400m", "pll-peri0-300m", "pll-peri0-200m" };
 
-static struct clk_div_table gpu_div_table[] = {
-    { .val = 0, .div = 1 },
-    { .val = 8, .div = 2 },
-    { .val = 12, .div = 4 },
-    { /* Sentinel */ },
-};
-
-static struct ccu_div gpu_clk = {
-	.enable         = BIT(31),
-	.div            = _SUNXI_CCU_DIV_TABLE(0, 4, gpu_div_table),
-	.mux            = _SUNXI_CCU_MUX(24, 3),
-	.common         = {
-		.reg            = 0x0670,
-		.hw.init        = CLK_HW_INIT_PARENTS("gpu", gpu_parents,
-				&ccu_div_ops,
-				CLK_OPS_PARENT_ENABLE),
-	},
-};
+static SUNXI_CCU_M_WITH_MUX_GATE(gpu_clk, "gpu",
+		gpu_parents, 0x0670,
+		0, 4,	/* M */
+		24, 3,	/* mux */
+		BIT(31),	/* gate */
+		0);
 
 static SUNXI_CCU_GATE(bus_gpu_clk, "bus-gpu",
 		"dcxo24M",
@@ -1867,4 +1855,4 @@ module_exit(sun55iw3_ccu_exit);
 MODULE_DESCRIPTION("Allwinner sun55iw3 clk driver");
 MODULE_AUTHOR("rengaomin<rengaomin@allwinnertech.com>");
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("1.5.5");
+MODULE_VERSION("1.5.4");

@@ -39,8 +39,39 @@ struct general_panel {
 	struct gpio_desc *enable_gpio[GPIO_MAX];
 	struct gpio_desc *reset_gpio;
 	enum drm_panel_orientation orientation;
-	bool non_edid_modes;
+	unsigned int power_delay_ms;
 };
+
+bool general_panel_edp_is_support_backlight(struct drm_panel *panel)
+{
+	return panel->backlight;
+}
+EXPORT_SYMBOL(general_panel_edp_is_support_backlight);
+
+int general_panel_edp_get_backlight_value(struct drm_panel *panel)
+{
+	if (panel->backlight)
+		return backlight_get_brightness(panel->backlight);
+
+	return 0;
+}
+EXPORT_SYMBOL(general_panel_edp_get_backlight_value);
+
+void general_panel_edp_set_backlight_value(struct drm_panel *panel, int brightness)
+{
+	if (!panel->backlight || backlight_is_blank(panel->backlight) || brightness <= 0)
+		return ;
+
+	// TODO: support backlight mapping
+	panel->backlight->props.brightness = brightness;
+	backlight_update_status(panel->backlight);
+}
+EXPORT_SYMBOL(general_panel_edp_set_backlight_value);
+
+static void general_panel_sleep(int msec)
+{
+	mdelay(msec);
+}
 
 static inline struct general_panel *to_general_panel(struct drm_panel *panel)
 {
@@ -81,7 +112,7 @@ static int general_panel_prepare(struct drm_panel *panel)
 					i, err);
 				return err;
 			}
-			msleep(10);
+			general_panel_sleep(edp_panel->power_delay_ms);
 		}
 	}
 
@@ -113,7 +144,9 @@ static int general_panel_get_modes(struct drm_panel *panel,
 	struct edid *edid = NULL;
 	int mode_num = 0;
 
-	if (edp_panel->non_edid_modes) {
+	if ((edp_panel->video_mode.hactive != 0) &&
+	    (edp_panel->video_mode.vactive != 0) &&
+	    (edp_panel->video_mode.pixelclock != 0)) {
 		mode = drm_mode_create(connector->dev);
 		if (!mode)
 			return 0;
@@ -122,26 +155,14 @@ static int general_panel_get_modes(struct drm_panel *panel,
 		mode->type |= DRM_MODE_TYPE_USERDEF;
 		drm_mode_probed_add(connector, mode);
 		mode_num++;
-	} else {
-		if (connector->edid_blob_ptr)
-			edid = drm_edid_duplicate(connector->edid_blob_ptr->data);
-		else
-			DRM_ERROR("edid for connector not update yet!\n");
-
-		mode_num += drm_add_edid_modes(connector, edid);
-
-		if (!mode_num) {
-			mode = drm_mode_create(connector->dev);
-			if (!mode)
-				return 0;
-
-			DRM_ERROR("parse mode from edid fail, try to parse mode from dts!\n");
-			drm_display_mode_from_videomode(&edp_panel->video_mode, mode);
-			mode->type |= DRM_MODE_TYPE_USERDEF;
-			drm_mode_probed_add(connector, mode);
-			mode_num++;
-		}
 	}
+
+	if (connector->edid_blob_ptr)
+		edid = drm_edid_duplicate(connector->edid_blob_ptr->data);
+	else
+		DRM_ERROR("edid for connector not update yet!\n");
+
+	mode_num += drm_add_edid_modes(connector, edid);
 
 	drm_connector_set_panel_orientation(connector, edp_panel->orientation);
 
@@ -166,11 +187,6 @@ static int general_panel_parse_dt(struct general_panel *edp_panel)
 	if (ret < 0) {
 		edp_panel->orientation = DRM_MODE_PANEL_ORIENTATION_NORMAL;
 	}
-
-	if (of_find_property(np, "non-edid-modes", NULL))
-		edp_panel->non_edid_modes = true;
-	else
-		edp_panel->non_edid_modes = false;
 
 	ret = of_get_display_timing(np, "panel-timing", &timing);
 	if (ret < 0) {
@@ -221,11 +237,14 @@ static int general_panel_probe(struct platform_device *pdev)
 		}
 	}
 
+	if (of_property_read_u32(edp_panel->dev->of_node, "power-delay-ms", &edp_panel->power_delay_ms) < 0)
+		edp_panel->power_delay_ms = 10;
+
 	/* Get GPIOs and backlight controller. */
 	for (i = 0; i < GPIO_MAX; i++) {
 		gpio_name = kasprintf(GFP_KERNEL, "enable%d", i);
 		edp_panel->enable_gpio[i] =
-			devm_gpiod_get_optional(edp_panel->dev, gpio_name, GPIOD_OUT_LOW);
+			devm_gpiod_get_optional(edp_panel->dev, gpio_name, GPIOD_OUT_HIGH);
 		if (IS_ERR(edp_panel->enable_gpio[i])) {
 			ret = PTR_ERR(edp_panel->enable_gpio[i]);
 			dev_err(edp_panel->dev, "failed to request %s GPIO: %d\n", gpio_name,

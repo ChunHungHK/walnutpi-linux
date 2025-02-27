@@ -8,22 +8,39 @@
  * License version 2.  This program is licensed "as is" without any
  * warranty of any kind, whether express or implied.
  ******************************************************************************/
-
 #ifndef _DW_I2CM_H
 #define _DW_I2CM_H
 
-#include "dw_dev.h"
-
+/**
+ * @desc: dw ddc get rate.
+ * @return: ddc rate. (*100Hz.)
+ */
+int dw_i2cm_get_rate(void);
+/**
+ * @desc: dw i2c set mode and rate
+ * @mode: i2c mode. standard or fast mode
+ * @rate: i2c rate. (*100Hz)
+ * @return: 0 - suaccess
+ *         -1 - failed
+ */
+int dw_i2cm_set_ddc(u32 mode, u32 rate);
+/**
+ * @desc: dw i2c master send and receive
+ * @msgs: send or receive message buffer
+ * @num: need send or receive message number
+ * @return: actual send or receive message number
+ */
 int dw_i2cm_xfer(struct i2c_msg *msgs, int num);
-
-int dw_i2cm_adap_bind(struct i2c_adapter *adap);
-
+/**
+ * @desc: dw i2c master retry init
+ * @return: 0 - success
+ */
 int dw_i2cm_re_init(void);
-
+/**
+ * @desc: dw i2c master init
+ * @return: 0 - success
+ */
 int dw_i2cm_init(void);
-
-#define DW_I2CM_MODE_STANDARD	(0x0)
-#define DW_I2CM_MODE_FAST		(0x1)
 
 /*****************************************************************************
  *                                                                           *

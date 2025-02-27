@@ -13,73 +13,62 @@
 #ifndef __PANELS_H__
 #define __PANELS_H__
 
-#include <linux/gpio/consumer.h>
-#include <linux/module.h>
-#include <linux/of_platform.h>
-#include <linux/platform_device.h>
-#include <linux/regulator/consumer.h>
-#include <linux/slab.h>
-#include <video/display_timing.h>
-#include <video/of_display_timing.h>
-#include <video/videomode.h>
-#include <drm/drm_crtc.h>
-#include <drm/drm_panel.h>
-
-#include "de_dsi.h"
-
-#define PANEL_POWER_MAX 10
-#define PANEL_GPIO_MAX 10
-
-#define LCD_PIN_STATE_ACTIVE "active"
-#define LCD_PIN_STATE_SLEEP "sleep"
-
-struct sunxi_panel_delay {
-	unsigned int prepare_time;
-	unsigned int enable_time;
-	unsigned int disable_time;
-	unsigned int unprepare_time;
-};
-
-struct sunxi_panel {
+#if IS_ENABLED(CONFIG_PANEL_DSI_GENERAL)
+struct panel_dsi {
 	struct drm_panel panel;
 	struct device *dev;
-	struct videomode video_mode;
-	unsigned int num_modes;
-	struct display_timing timings;
-	unsigned int num_timings;
-	struct disp_panel_para panel_para;
-	struct panel_extend_para extend_para;
-	struct sunxi_panel_delay delay;
+	struct device *panel_dev;
+	struct mipi_dsi_device *dsi;
 
-	struct regulator *supply[PANEL_POWER_MAX];
+	const struct panel_desc *desc;
+	unsigned int bus_format;
+	unsigned int vrr_setp;
 
-	struct gpio_desc *enable_gpio;
+	unsigned int power_num;
+	unsigned int gpio_num;
+	struct regulator *supply[10];
+	struct regulator *avdd_supply;
+	struct regulator *avee_supply;
+	unsigned int avdd_output_voltage;
+	unsigned int avee_output_voltage;
+	struct gpio_desc *enable_gpio[10];
 	struct gpio_desc *reset_gpio;
-	struct gpio_desc *general_gpio[PANEL_GPIO_MAX];
-	//	TODO use struct mipi_dsi_device
-	struct device *dsi;
+
+	struct drm_dsc_config *dsc;
+
+	enum drm_panel_orientation orientation;
 };
 
-static inline struct sunxi_panel *to_sunxi_panel(struct drm_panel *panel)
-{
-	return container_of(panel, struct sunxi_panel, panel);
-}
+int panel_dsi_regulator_enable(struct drm_panel *panel);
+bool panel_dsi_is_support_backlight(struct drm_panel *panel);
+int panel_dsi_get_backlight_value(struct drm_panel *panel);
+void panel_dsi_set_backlight_value(struct drm_panel *panel, int brightness);
+#endif
 
-int sunxi_panel_sw_enable(struct drm_panel *panel);
-s32 sunxi_panel_parse_timings(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_parse_delay_time(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_parse_dsi(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_parse_lvds(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_parse_hv(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_parse_misc(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_get_power(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_get_enable_gpio(struct sunxi_panel *sunxi_panel);
-s32 sunxi_panel_get_reset_gpio(struct sunxi_panel *sunxi_panel);
-void sunxi_panel_set_gpio_output_value(struct gpio_desc *gpio,
-				       unsigned int value);
-void sunxi_panel_enable_gpio(struct sunxi_panel *sunxi_panel);
-void sunxi_panel_disable_gpio(struct sunxi_panel *sunxi_panel);
-void sunxi_panel_reset_assert(struct sunxi_panel *sunxi_panel);
-void sunxi_panel_reset_deassert(struct sunxi_panel *sunxi_panel);
+#if IS_ENABLED(CONFIG_PANEL_LVDS_GENERAL)
+int panel_lvds_regulator_enable(struct drm_panel *panel);
+bool panel_lvds_is_support_backlight(struct drm_panel *panel);
+int panel_lvds_get_backlight_value(struct drm_panel *panel);
+void panel_lvds_set_backlight_value(struct drm_panel *panel, int brightness);
+#endif
+
+#if IS_ENABLED(CONFIG_PANEL_RGB_GENERAL)
+int panel_rgb_regulator_enable(struct drm_panel *panel);
+bool panel_rgb_is_support_backlight(struct drm_panel *panel);
+int panel_rgb_get_backlight_value(struct drm_panel *panel);
+void panel_rgb_set_backlight_value(struct drm_panel *panel, int brightness);
+#endif
+
+#if IS_ENABLED(CONFIG_PANEL_EDP_GENERAL)
+bool general_panel_edp_is_support_backlight(struct drm_panel *panel);
+int general_panel_edp_get_backlight_value(struct drm_panel *panel);
+void general_panel_edp_set_backlight_value(struct drm_panel *panel, int brightness);
+#else
+static inline bool general_panel_edp_is_support_backlight(struct drm_panel *panel) { return false; }
+static inline int general_panel_edp_get_backlight_value(struct drm_panel *panel) { return 0; }
+static inline void general_panel_edp_set_backlight_value(struct drm_panel *panel, int brightness) {}
+#endif
+
+#define MIPI_DSI_MODE_VRR	BIT(24)
 
 #endif

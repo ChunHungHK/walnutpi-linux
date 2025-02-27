@@ -1,5 +1,5 @@
 /************************************************************************
-* Copyright (c) 2012-2020, Focaltech Systems (R)ï¿½ï¿½All Rights Reserved.
+* Copyright (c) 2012-2020, Focaltech Systems (R)£¬All Rights Reserved.
 *
 * File Name: focaltech_test_ini.c
 *

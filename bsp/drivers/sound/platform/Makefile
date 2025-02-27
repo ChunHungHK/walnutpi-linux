@@ -7,7 +7,6 @@
 ccflags-y += -I $(srctree)/bsp/drivers/sound/adapter
 ccflags-y += -I $(srctree)/bsp/drivers/sound/platform
 ADPT_DIR := ../adapter
-
 snd_soc_sunxi_component_sfx-objs		+= snd_sunxi_sfx.o
 obj-$(CONFIG_SND_SOC_SUNXI_SFX)			+= snd_soc_sunxi_component_sfx.o
 

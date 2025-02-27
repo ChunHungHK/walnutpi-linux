@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
-
 ccflags-y := -DDYNAMIC_DEBUG_MODULE
 ccflags-y += -I$(mkfile_dir)/
 

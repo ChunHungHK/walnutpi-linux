@@ -10,15 +10,17 @@
  * option) any later version.
  */
 
+#include <linux/platform_device.h>
+#include <linux/of_device.h>
 #include <linux/clk.h>
+#include <linux/reset.h>
 #include <linux/pm_runtime.h>
 #include <linux/dma-mapping.h>
-#include <linux/clk.h>
 #include <drm/drm_print.h>
 #include <linux/component.h>
 
+#include "sunxi_drm_drv.h"
 #include "sunxi_tcon_top.h"
-#include "disp_al_tcon.h"
 
 struct tcon_top_data {
 	unsigned int id;
@@ -27,8 +29,12 @@ struct tcon_top_data {
 struct tcon_top {
 	uintptr_t reg_base;
 	struct clk *clk_dpss;
+	struct clk *clk_ahb;
+	struct clk *clk_ahb_gate;
 	struct reset_control *rst_bus_dpss;
+	struct reset_control *rst_bus_reg;
 	const struct tcon_top_data *top_data;
+	bool sw_enable;
 };
 
 static int sunxi_tcon_top_bind(struct device *dev, struct device *master,
@@ -36,8 +42,10 @@ static int sunxi_tcon_top_bind(struct device *dev, struct device *master,
 {
 	struct tcon_top *top;
 	struct resource *res;
+	struct drm_device *drm = (struct drm_device *)data;
 	struct platform_device *pdev = to_platform_device(dev);
 
+	DRM_INFO("[TCON_TOP]%s start\n", __FUNCTION__);
 	top = devm_kzalloc(dev, sizeof(*top), GFP_KERNEL);
 	if (!top)
 		return -ENOMEM;
@@ -55,17 +63,49 @@ static int sunxi_tcon_top_bind(struct device *dev, struct device *master,
 		return -EINVAL;
 	}
 
-	top->clk_dpss = devm_clk_get(dev, "clk_bus_dpss_top");
+	top->clk_dpss = devm_clk_get_optional(dev, "clk_bus_dpss_top");
+
 	if (IS_ERR(top->clk_dpss)) {
 		DRM_ERROR("fail to get clk dpss_top\n");
 		return -EINVAL;
 	}
 
+	top->clk_ahb = devm_clk_get_optional(dev, "clk_ahb");
+
+	if (IS_ERR(top->clk_ahb)) {
+		DRM_ERROR("fail to get clk ahb %ld\n", PTR_ERR(top->clk_ahb));
+		return -EINVAL;
+	}
+
+	top->clk_ahb_gate = devm_clk_get_optional(dev, "clk_ahb_gate");
+
+	if (IS_ERR(top->clk_ahb_gate)) {
+		DRM_ERROR("fail to get clk ahb gate\n");
+		return -EINVAL;
+	}
+
 	top->rst_bus_dpss =
-		devm_reset_control_get_shared(dev, "rst_bus_dpss_top");
+		devm_reset_control_get_optional_shared(dev, "rst_bus_dpss_top");
 	if (IS_ERR(top->rst_bus_dpss)) {
 		DRM_ERROR("fail to get reset rst_bus_dpss_top\n");
 		return -EINVAL;
+	}
+
+	top->rst_bus_reg =
+		devm_reset_control_get_optional_shared(dev, "rst_bus_reg");
+
+	if (IS_ERR(top->rst_bus_reg)) {
+		DRM_ERROR("fail to get reset rst_bus_reg\n");
+		return -EINVAL;
+	}
+
+	top->sw_enable = sunxi_drm_check_tcon_top_boot_enabled(drm, top->top_data->id);
+	/* sw_enable means the device is enabled in uboot, so set pm runtime to active */
+	if (top->sw_enable) {
+		pm_runtime_set_active(dev);
+		pm_runtime_enable(dev);
+	} else {
+		pm_runtime_enable(dev);
 	}
 
 	tcon_top_set_reg_base(top->top_data->id, top->reg_base);
@@ -76,6 +116,7 @@ static int sunxi_tcon_top_bind(struct device *dev, struct device *master,
 static void sunxi_tcon_top_unbind(struct device *dev, struct device *master,
 				  void *data)
 {
+	pm_runtime_disable(dev);
 }
 
 static const struct component_ops sunxi_tcon_top_component_ops = {
@@ -85,14 +126,13 @@ static const struct component_ops sunxi_tcon_top_component_ops = {
 
 static int sunxi_tcon_top_probe(struct platform_device *pdev)
 {
-	pm_runtime_enable(&pdev->dev);
+	DRM_INFO("[TCON_TOP]%s start\n", __FUNCTION__);
 	return component_add(&pdev->dev, &sunxi_tcon_top_component_ops);
 }
 
 static int sunxi_tcon_top_remove(struct platform_device *pdev)
 {
 	component_del(&pdev->dev, &sunxi_tcon_top_component_ops);
-	pm_runtime_disable(&pdev->dev);
 	return 0;
 }
 
@@ -140,9 +180,27 @@ int sunxi_tcon_top_clk_enable(struct device *tcon_top)
 		return -EINVAL;
 	}
 
+	ret = reset_control_deassert(topif->rst_bus_reg);
+	if (ret) {
+		DRM_ERROR("reset_control_deassert for rst_bus_reg failed!\n");
+		return ret;
+	}
+
 	ret = reset_control_deassert(topif->rst_bus_dpss);
 	if (ret) {
 		DRM_ERROR("reset_control_deassert for rst_bus_dpss failed!\n");
+		return ret;
+	}
+
+	ret = clk_prepare_enable(topif->clk_ahb_gate);
+	if (ret != 0) {
+		DRM_ERROR("fail enable topif's ahb gate clock!\n");
+		return ret;
+	}
+
+	ret = clk_prepare_enable(topif->clk_ahb);
+	if (ret != 0) {
+		DRM_ERROR("fail enable topif's ahb clock!\n");
 		return ret;
 	}
 
@@ -151,12 +209,16 @@ int sunxi_tcon_top_clk_enable(struct device *tcon_top)
 		DRM_ERROR("fail enable topif's clock!\n");
 		return ret;
 	}
+
 	pm_runtime_get_sync(tcon_top);
+
 	return 0;
 }
 
 int sunxi_tcon_top_clk_disable(struct device *tcon_top)
 {
+//TODO FXIME
+
 	int ret;
 	struct tcon_top *topif = dev_get_drvdata(tcon_top);
 
@@ -165,36 +227,23 @@ int sunxi_tcon_top_clk_disable(struct device *tcon_top)
 		return -EINVAL;
 	}
 
-	clk_disable_unprepare(topif->clk_dpss);
+	pm_runtime_put_sync(tcon_top);
 
+	clk_disable_unprepare(topif->clk_dpss);
+	clk_disable_unprepare(topif->clk_ahb);
+	clk_disable_unprepare(topif->clk_ahb_gate);
 	ret = reset_control_assert(topif->rst_bus_dpss);
 	if (ret) {
 		DRM_ERROR(
 			"reset_control_deassert for rst_bus_if_top failed!\n");
 		return ret;
 	}
-	pm_runtime_put_sync(tcon_top);
-
-	return 0;
-}
-
-int sunxi_tcon_top_module_init(void)
-{
-	int ret = 0;
-
-	DRM_INFO("%s start\n", __FUNCTION__);
-
-	ret = platform_driver_register(&sunxi_tcon_top_platform_driver);
+	ret = reset_control_assert(topif->rst_bus_reg);
 	if (ret) {
-		DRM_ERROR("platform_driver_register failed\n");
+		DRM_ERROR(
+			"reset_control_deassert for rst_bus_reg failed!\n");
+		return ret;
 	}
 
-	DRM_INFO("%s ret = %d\n", __FUNCTION__, ret);
-	return ret;
-}
-
-void sunxi_tcon_top_module_exit(void)
-{
-	DRM_INFO("[SUNXI-TCON]sunxi_tcon_module_exit\n");
-	platform_driver_unregister(&sunxi_tcon_top_platform_driver);
+	return 0;
 }

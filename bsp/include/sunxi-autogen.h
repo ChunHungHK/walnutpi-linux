@@ -1,1 +1,1 @@
-#define AW_BSP_VERSION "bsp v1.1"
+#define AW_BSP_VERSION "version 1.4"

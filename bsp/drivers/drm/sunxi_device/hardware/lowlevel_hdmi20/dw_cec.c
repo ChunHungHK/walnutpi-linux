@@ -9,6 +9,7 @@
  * warranty of any kind, whether express or implied.
  ******************************************************************************/
 #include <linux/delay.h>
+#include "dw_dev.h"
 #include "dw_mc.h"
 #include "dw_cec.h"
 
@@ -55,7 +56,6 @@ void dw_cec_send_msg(u8 *buf, u8 len, u8 type)
 
 void dw_cec_set_logical_addr(u16 addr)
 {
-	log_trace1(addr);
 	dw_write(CEC_ADDR_H, ((addr >> 8) & 0xFF));
 	dw_write(CEC_ADDR_L, ((addr >> 0) & 0xFF));
 }
@@ -80,7 +80,7 @@ int dw_cec_set_enable(u8 enable)
 	u8 mask = 0x0;
 	if (enable == 0x1) {
 		/* enable cec module clock */
-		dw_mc_disable_cec_clock(0x0);
+		dw_mc_set_clk(DW_MC_CLK_CEC, DW_HDMI_ENABLE);
 
 		udelay(20);
 
@@ -106,7 +106,7 @@ int dw_cec_set_enable(u8 enable)
 		dw_write(CEC_MASK, dw_read(CEC_MASK) & ~mask);
 
 		/* unmute irq */
-		dw_mc_irq_unmute_source(DW_IRQ_CEC);
+		dw_mc_irq_unmute(DW_MC_IRQ_CEC);
 	} else {
 		/* mask interrupt */
 		mask |= CEC_MASK_DONE_MASK;
@@ -118,11 +118,11 @@ int dw_cec_set_enable(u8 enable)
 		dw_write(CEC_MASK, dw_read(CEC_MASK) | mask);
 
 		/* mute irq */
-		dw_mc_irq_mute_source(DW_IRQ_CEC);
+		dw_mc_irq_mute(DW_MC_IRQ_CEC);
 
 		udelay(20);
 		/* disable cec module clock */
-		dw_mc_disable_cec_clock(0x1);
+		dw_mc_set_clk(DW_MC_CLK_CEC, DW_HDMI_DISABLE);
 	}
 	return 0;
 }
