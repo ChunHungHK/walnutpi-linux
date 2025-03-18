@@ -1,6 +1,5 @@
 
 
-
 &de {
 	chn_cfg_mode = <3>;
 	status = "okay";
@@ -14,9 +13,7 @@
 	status = "okay";
 };
 
-&dlcd0 {
-	status = "okay";
-};
+
 
 &dlcd2 {
 	status = "disabled";
@@ -111,7 +108,9 @@
 		};
 	};
 };
-
+&dlcd0 {
+	status = "okay";
+};
 
 &dsi0combophy {
 	status = "okay";
@@ -120,6 +119,7 @@
 &dsi1combophy {
 	status = "disabled";
 };
+
 
 &tv0 {
 	status = "okay";
@@ -340,5 +340,62 @@
 		default-brightness-level = <200>;
 		enable-gpios = <&pio PI 5 GPIO_ACTIVE_HIGH>;
 		pwms = <&pwm0 5 5000000 0>;
+	};
+};
+
+/{
+	panel_dsi: panel_dsi@1 {
+		compatible = "allwinner,panel-dsi";
+		status = "disabled";
+		power-delay-ms = <10>;
+		
+		port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			panel0_in: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&panel_output_0>;
+			};
+		};
+		
+	};
+};
+&dsi0{
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "disabled";
+	ports {
+		dsi0_out: port@1{
+			dsi_out_panel: endpoint {
+				remote-endpoint = <&virtual_panel_input>;
+			};
+		};
+	};
+	virtual_panel: virtual_panel@0 {
+		compatible = "allwinner,virtual-panel";
+		status = "okay";
+		reg = <0>;
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			virtual_panel_in: port@0 {
+				reg = <0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				virtual_panel_input: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&dsi_out_panel>;
+				};
+			};
+			panel_out: port@1 {
+				reg = <1>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				panel_output_0: endpoint@0 {
+					reg = <0>;
+					remote-endpoint = <&panel0_in>;
+				};
+			};
+		};
 	};
 };
