@@ -1,4 +1,33 @@
 
+&pio {
+	
+	rgb24_pins_a: rgb24@0 {
+		pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", "PD8", "PD9", \
+		"PD10", "PD11", "PD12", "PD13", "PD14", "PD15", "PD16", "PD17", "PD18", "PD19", \
+		"PD20", "PD21", "PD22","PD23","PD24","PD25","PD26","PD27";
+		function = "dpss";
+		drive-strength = <30>;
+	};
+	
+	rgb24_pins_b: rgb24@1 {
+		pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", "PD8", "PD9", \
+		"PD10", "PD11", "PD12", "PD13", "PD14", "PD15", "PD16", "PD17", "PD18", "PD19", \
+		"PD20", "PD21", "PD22", "PD23","PD24","PD25","PD26","PD27";
+		function = "gpio_in";
+	};
+	
+	lvds0_pins_a: lvds0@0 {
+		pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", "PD8", "PD9";
+		function = "lvds0";
+		drive-strength = <30>;
+	};
+	
+	lvds0_pins_b: lvds0@1 {
+		pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", "PD8", "PD9";
+		function = "gpio_in";
+	};
+};
+
 
 &de {
 	chn_cfg_mode = <3>;
@@ -364,6 +393,8 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "disabled";
+	pinctrl-0 = <&dsi0_4lane_pins_a>;
+	pinctrl-names = "active";
 	ports {
 		dsi0_out: port@1{
 			dsi_out_panel: endpoint {
