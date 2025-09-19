@@ -3,9 +3,9 @@ name: Integrate DVB Drivers and Build Kernel
 on:
   workflow_dispatch:
   push:
-    branches: [master, walnutpi-5.15.174, integrate-dvb-drivers]
+    branches: [master, 5.15.174, integrate-dvb-drivers]
   pull_request:
-    branches: [master, walnutpi-5.15.174]
+    branches: [master, 5.15.174]
 
 jobs:
   integrate-and-build:
@@ -16,7 +16,7 @@ jobs:
 
       - name: Clone walnutpi/linux
         run: |
-          git clone --depth=1 --branch walnutpi-5.15.174 https://github.com/walnutpi/linux walnutpi-linux
+          git clone --depth=1 --branch 5.15.174 https://github.com/walnutpi/linux walnutpi-linux
           cd walnutpi-linux
           git submodule update --init --recursive  # Handle submodules if any
         env:
