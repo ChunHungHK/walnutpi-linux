@@ -75,7 +75,7 @@ jobs:
 
           sed -i '/obj-$(CONFIG_DVB_CORE)/a \
           obj-$(CONFIG_DVB_AVL6381) += avl6381.o\n\
-          obj-$(CONFIG_DVB_MXL603) += mxl603.o\n\
+          obj-$(CONFIG_DVB_MXL603) += mxl603*.o\n\
           obj-$(CONFIG_DVB_HD2312) += hd2312.o\
           ' drivers/media/dvb-frontends/Makefile
 
@@ -97,7 +97,7 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           # Enable new config options as modules
           scripts/config --module CONFIG_DVB_AVL6381
-          scripts/config --module CONFIG_DVB_MXL603
+          scripts/config --module CONFIG_DVB_MXL603*
           scripts/config --module CONFIG_DVB_HD2312
           scripts/config --module CONFIG_DVB_USB_IT930X
           scripts/config --module CONFIG_DVB_USB_CY68013
@@ -142,7 +142,7 @@ jobs:
         working-directory: walnutpi-linux
         run: |
           scripts/checkpatch.pl -f drivers/media/dvb-frontends/avl6381.c
-          scripts/checkpatch.pl -f drivers/media/dvb-frontends/mxl603.c
+          scripts/checkpatch.pl -f drivers/media/dvb-frontends/mxl603*.c
           scripts/checkpatch.pl -f drivers/media/dvb-frontends/hd2312.c
           scripts/checkpatch.pl -f drivers/media/usb/dvb-usb-v2/it930x.c
           scripts/checkpatch.pl -f drivers/media/usb/dvb-usb-v2/cy68013.c
