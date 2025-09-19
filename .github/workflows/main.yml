@@ -2,9 +2,9 @@ name: Integrate DVB Drivers and Build Kernel
 
 on:
   push:
-    branches: [main, integrate-dvb-drivers]
+    branches: [master, walnutpi-5.15.174, integrate-dvb-drivers]
   pull_request:
-    branches: [main]
+    branches: [master, walnutpi-5.15.174]
 
 jobs:
   integrate-and-build:
@@ -14,15 +14,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: walnutpi/linux
-          ref: ${{ github.ref }}
+          ref: walnutpi-5.15.174
           path: walnutpi-linux
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y git build-essential flex bison libssl-dev bc libncurses5-dev libncursesw5-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+          sudo apt install -y git build-essential flex bison libssl-dev bc libncurses5-dev libncursesw5-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu jq
 
-      - name: Clone driver repos
+      - name: Clone driver repositories
         run: |
           git clone https://github.com/nxdong520/avl6381
           git clone https://github.com/hanwckf/hd2312
@@ -30,25 +30,55 @@ jobs:
       - name: Copy files and update Kconfig/Makefile
         working-directory: walnutpi-linux
         run: |
-          # 步驟1: 複製文件 (假設文件路徑正確，需調整)
+          # Step 1: Copy driver source files (adjust paths as needed)
           cp ../avl6381/avl6381.* drivers/media/dvb-frontends/
           cp ../avl6381/mxl603.* drivers/media/dvb-frontends/
           cp ../avl6381/it930x.* drivers/media/usb/dvb-usb-v2/
           cp ../hd2312/hd2312.* drivers/media/dvb-frontends/
-          cp ../hd2312/cy68013.* drivers/media/usb/dvb-usb-v2/  # 調整文件名
-          
-          # 步驟2-3: 更新 Kconfig 和 Makefile (使用 sed 自動追加)
+          cp ../hd2312/cy68013.* drivers/media/usb/dvb-usb-v2/  # Adjust filename if needed
+
+          # Step 2-3: Append Kconfig and Makefile entries using sed
           sed -i '/endmenu/i \
           config DVB_AVL6381\n\
-          \ttristate "Availink AVL6381 DVB-C/DTMB/DVB-T2解調器"\n\
+          \ttristate "Availink AVL6381 DVB-C/DTMB/DVB-T2 demodulator"\n\
           \tdepends on DVB_CORE && I2C\n\
           \thelp\n\
-          \t  支持基於Availink AVL6381的USB設備（DVBC/DTMB/DVBT2）。\n\
-          # ... (追加其他 config，類似步驟2)
+          \t  Support for Availink AVL6381 USB devices (DVBC/DTMB/DVBT2).\n\
+          config DVB_MXL603\n\
+          \ttristate "MaxLinear MXL603 tuner"\n\
+          \tdepends on DVB_CORE && I2C\n\
+          \thelp\n\
+          \t  Support for MaxLinear MXL603 tuner in AVL6381 devices.\n\
+          config DVB_HD2312\n\
+          \ttristate "HDIC HD2312 DTMB/DMB-TH demodulator"\n\
+          \tdepends on DVB_CORE && I2C\n\
+          \thelp\n\
+          \t  Support for HDIC HD2312 USB adapters (DTMB/DMB-TH).\n\
           ' drivers/media/dvb-frontends/Kconfig
-          
-          sed -i '/obj-$(CONFIG_DVB_CORE)/a obj-$(CONFIG_DVB_AVL6381) += avl6381.o' drivers/media/dvb-frontends/Makefile
-          # 類似追加其他 obj- 和 USB Kconfig/Makefile
+
+          sed -i '/endmenu/i \
+          config DVB_USB_IT930X\n\
+          \ttristate "ITE IT930x USB DVB device (for AVL6381)"\n\
+          \tdepends on DVB_USB_V2\n\
+          \thelp\n\
+          \t  Support for ITE IT930x USB bridge in AVL6381 devices.\n\
+          config DVB_USB_CY68013\n\
+          \ttristate "Cypress CY68013A USB DVB device (for HD2312)"\n\
+          \tdepends on DVB_USB_V2\n\
+          \thelp\n\
+          \t  Support for Cypress CY68013A USB bridge in HD2312 devices.\n\
+          ' drivers/media/usb/dvb-usb-v2/Kconfig
+
+          sed -i '/obj-$(CONFIG_DVB_CORE)/a \
+          obj-$(CONFIG_DVB_AVL6381) += avl6381.o\n\
+          obj-$(CONFIG_DVB_MXL603) += mxl603.o\n\
+          obj-$(CONFIG_DVB_HD2312) += hd2312.o\
+          ' drivers/media/dvb-frontends/Makefile
+
+          sed -i '/obj-$(CONFIG_DVB_USB_V2)/a \
+          obj-$(CONFIG_DVB_USB_IT930X) += it930x.o\n\
+          obj-$(CONFIG_DVB_USB_CY68013) += cy68013.o\
+          ' drivers/media/usb/dvb-usb-v2/Makefile
 
       - name: Cache kernel build
         uses: actions/cache@v4
@@ -59,13 +89,19 @@ jobs:
       - name: Configure kernel (non-interactive)
         working-directory: walnutpi-linux
         run: |
-          # 使用 olddefconfig 非互動載入/更新 .config
+          # Use olddefconfig for non-interactive config update
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-          # 手動啟用新 config (使用 scripts/config)
-          scripts/config --enable CONFIG_DVB_AVL6381
-          scripts/config --module CONFIG_DVB_AVL6381  # 若選 M
-          # 類似啟用其他 (MXL603, HD2312, IT930X, CY68013)
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- oldconfig  # 解決依賴
+          # Enable new config options as modules
+          scripts/config --module CONFIG_DVB_AVL6381
+          scripts/config --module CONFIG_DVB_MXL603
+          scripts/config --module CONFIG_DVB_HD2312
+          scripts/config --module CONFIG_DVB_USB_IT930X
+          scripts/config --module CONFIG_DVB_USB_CY68013
+          # Ensure dependencies
+          scripts/config --enable CONFIG_DVB_CORE
+          scripts/config --enable CONFIG_DVB_USB_V2
+          scripts/config --enable CONFIG_I2C
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- oldconfig
 
       - name: Build kernel
         working-directory: walnutpi-linux
@@ -100,4 +136,9 @@ jobs:
 
       - name: Test (lint and basic check)
         working-directory: walnutpi-linux
-        run: scripts/checkpatch.pl -f drivers/media/dvb-frontends/avl6381.c  # 檢查程式碼風格
+        run: |
+          scripts/checkpatch.pl -f drivers/media/dvb-frontends/avl6381.c
+          scripts/checkpatch.pl -f drivers/media/dvb-frontends/mxl603.c
+          scripts/checkpatch.pl -f drivers/media/dvb-frontends/hd2312.c
+          scripts/checkpatch.pl -f drivers/media/usb/dvb-usb-v2/it930x.c
+          scripts/checkpatch.pl -f drivers/media/usb/dvb-usb-v2/cy68013.c
