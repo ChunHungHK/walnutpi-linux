@@ -1,0 +1,103 @@
+name: Integrate DVB Drivers and Build Kernel
+
+on:
+  push:
+    branches: [main, integrate-dvb-drivers]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integrate-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout walnutpi/linux
+        uses: actions/checkout@v4
+        with:
+          repository: walnutpi/linux
+          ref: ${{ github.ref }}
+          path: walnutpi-linux
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git build-essential flex bison libssl-dev bc libncurses5-dev libncursesw5-dev gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Clone driver repos
+        run: |
+          git clone https://github.com/nxdong520/avl6381
+          git clone https://github.com/hanwckf/hd2312
+
+      - name: Copy files and update Kconfig/Makefile
+        working-directory: walnutpi-linux
+        run: |
+          # 步驟1: 複製文件 (假設文件路徑正確，需調整)
+          cp ../avl6381/avl6381.* drivers/media/dvb-frontends/
+          cp ../avl6381/mxl603.* drivers/media/dvb-frontends/
+          cp ../avl6381/it930x.* drivers/media/usb/dvb-usb-v2/
+          cp ../hd2312/hd2312.* drivers/media/dvb-frontends/
+          cp ../hd2312/cy68013.* drivers/media/usb/dvb-usb-v2/  # 調整文件名
+          
+          # 步驟2-3: 更新 Kconfig 和 Makefile (使用 sed 自動追加)
+          sed -i '/endmenu/i \
+          config DVB_AVL6381\n\
+          \ttristate "Availink AVL6381 DVB-C/DTMB/DVB-T2解調器"\n\
+          \tdepends on DVB_CORE && I2C\n\
+          \thelp\n\
+          \t  支持基於Availink AVL6381的USB設備（DVBC/DTMB/DVBT2）。\n\
+          # ... (追加其他 config，類似步驟2)
+          ' drivers/media/dvb-frontends/Kconfig
+          
+          sed -i '/obj-$(CONFIG_DVB_CORE)/a obj-$(CONFIG_DVB_AVL6381) += avl6381.o' drivers/media/dvb-frontends/Makefile
+          # 類似追加其他 obj- 和 USB Kconfig/Makefile
+
+      - name: Cache kernel build
+        uses: actions/cache@v4
+        with:
+          key: ${{ runner.os }}-kernel-build-${{ hashFiles('walnutpi-linux/.config') }}
+          path: walnutpi-linux
+
+      - name: Configure kernel (non-interactive)
+        working-directory: walnutpi-linux
+        run: |
+          # 使用 olddefconfig 非互動載入/更新 .config
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          # 手動啟用新 config (使用 scripts/config)
+          scripts/config --enable CONFIG_DVB_AVL6381
+          scripts/config --module CONFIG_DVB_AVL6381  # 若選 M
+          # 類似啟用其他 (MXL603, HD2312, IT930X, CY68013)
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- oldconfig  # 解決依賴
+
+      - name: Build kernel
+        working-directory: walnutpi-linux
+        run: make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc)
+
+      - name: Build and install modules
+        working-directory: walnutpi-linux
+        run: |
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=../rootfs
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-artifacts
+          path: |
+            walnutpi-linux/arch/arm64/boot/Image
+            walnutpi-linux/arch/arm64/boot/dts/*.dtb
+            rootfs/lib/modules/
+
+      - name: Commit changes (only on push to integrate branch)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/integrate-dvb-drivers'
+        run: |
+          cd walnutpi-linux
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git commit -m "Auto-integrate AVL6381 and HD2312 DVB drivers"
+          git push origin integrate-dvb-drivers
+        env:
+          Pi_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test (lint and basic check)
+        working-directory: walnutpi-linux
+        run: scripts/checkpatch.pl -f drivers/media/dvb-frontends/avl6381.c  # 檢查程式碼風格
