@@ -36,7 +36,7 @@ jobs:
         run: |
           # Step 1: Copy driver source files (adjust paths as needed)
           cp ../avl6381/avl6381.* drivers/media/dvb-frontends/
-          cp ../avl6381/mxl603.* drivers/media/dvb-frontends/
+          cp ../avl6381/mxl603*.* drivers/media/dvb-frontends/
           cp ../avl6381/it930x.* drivers/media/usb/dvb-usb-v2/
           cp ../hd2312/hd2312.* drivers/media/dvb-frontends/
           cp ../hd2312/cy68013.* drivers/media/usb/dvb-usb-v2/  # Adjust filename if needed
