@@ -1,6 +1,7 @@
 name: Integrate DVB Drivers and Build Kernel
 
 on:
+  workflow_dispatch:
   push:
     branches: [master, walnutpi-5.15.174, integrate-dvb-drivers]
   pull_request:
